@@ -101,23 +101,35 @@ namespace net.kvdb.webdav
             set { domain = value; }
         }
 
+        private bool useIntegratedAuthentication = false;
+        /// <summary>
+        /// Enable integrated Windows authentication
+        /// </summary>
+        public bool UseIntegratedAuthentication
+        {
+            get { return useIntegratedAuthentication; }
+            set { useIntegratedAuthentication = value; }
+        }
+
         Uri getServerUrl(String path, Boolean appendTrailingSlash)
         {
             String completePath = basePath;
             if (path != null)
             {
-            	completePath += path.Trim('/');
+                completePath += path.Trim('/');
             }
 
             if (appendTrailingSlash && completePath.EndsWith("/") == false) { completePath += '/'; }
 
-            if(port.HasValue) {
-				return new Uri(server + ":" + port + completePath);
+            if (port.HasValue)
+            {
+                return new Uri(server + ":" + port + completePath);
             }
-            else {
-            	return new Uri(server + completePath);
+            else
+            {
+                return new Uri(server + completePath);
             }
-            
+
         }
         #endregion
 
@@ -195,8 +207,8 @@ namespace net.kvdb.webdav
                         if (file.Length > 0)
                         {
                             // Want to see directory contents, not the directory itself.
-                            if (file[file.Length-1] == remoteFilePath || file[file.Length-1] == server) { continue; }
-                            files.Add(file[file.Length-1]);
+                            if (file[file.Length - 1] == remoteFilePath || file[file.Length - 1] == server) { continue; }
+                            files.Add(file[file.Length - 1]);
                         }
                     }
                 }
@@ -391,13 +403,13 @@ namespace net.kvdb.webdav
         void HTTPRequest(Uri uri, string requestMethod, IDictionary<string, string> headers, byte[] content, string uploadFilePath, AsyncCallback callback, object state)
         {
             httpWebRequest = (HttpWebRequest)HttpWebRequest.Create(uri);
-			
+
             /*
              * The following line fixes an authentication problem explained here:
              * http://www.devnewsgroups.net/dotnetframework/t9525-http-protocol-violation-long.aspx
              */
             System.Net.ServicePointManager.Expect100Continue = false;
-            
+
             // If you want to disable SSL certificate validation
             /*
             System.Net.ServicePointManager.ServerCertificateValidationCallback +=
@@ -407,22 +419,31 @@ namespace net.kvdb.webdav
                     return validationResult;
             };
             */
-        
-            // The server may use authentication
-            if (user != null && pass != null)
+
+            // Check if we must use the Windows Integrated Authentication
+            if (useIntegratedAuthentication)
             {
-                NetworkCredential networkCredential;
-                if (domain != null)
-                {
-                    networkCredential = new NetworkCredential(user, pass, domain);
-                }
-                else
-                {
-                    networkCredential = new NetworkCredential(user, pass);
-                }
-                httpWebRequest.Credentials = networkCredential;
-                // Send authentication along with first request.
+                httpWebRequest.Credentials = System.Net.CredentialCache.DefaultNetworkCredentials;
                 httpWebRequest.PreAuthenticate = true;
+            }
+            else
+            {
+                // The server may use user/password authentication
+                if (user != null && pass != null)
+                {
+                    NetworkCredential networkCredential;
+                    if (domain != null)
+                    {
+                        networkCredential = new NetworkCredential(user, pass, domain);
+                    }
+                    else
+                    {
+                        networkCredential = new NetworkCredential(user, pass);
+                    }
+                    httpWebRequest.Credentials = networkCredential;
+                    // Send authentication along with first request.
+                    httpWebRequest.PreAuthenticate = true;
+                }
             }
             httpWebRequest.Method = requestMethod;
 
